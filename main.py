@@ -29,7 +29,7 @@ SYSTEM_PROMPT = """
 التزم بالرد بالعربية باختصار وبأسلوب واضح ومقسم في نقاط.
 """
 
-# تهيئة عميل Google GenAI الحديث
+# تهيئة عميل Google GenAI
 client = None
 if GEMINI_API_KEY:
     client = genai.Client(api_key=GEMINI_API_KEY)
@@ -40,15 +40,15 @@ def process_message(message):
     print(f"📥 استلام رسالة: {message.text}", flush=True)
     
     if not client:
-        bot.reply_to(message, "⚠️ خطأ: لم يتم العثور على مفتاح GEMINI_API_KEY.")
+        bot.reply_to(message, "⚠️ خطأ: لم يتم التعرف على مفتاح GEMINI_API_KEY.")
         return
 
     try:
         full_prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
         
-        # ✅ استخدام الموديل المعتمد والمستقر رسمياً
+        # استدعاء مباشر عبر العميل الجديد مع الموديل المتاح
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=full_prompt
         )
         
@@ -58,7 +58,19 @@ def process_message(message):
             bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب.")
             
     except Exception as e:
-        print(f"❌ Gemini Error: {e}", flush=True)
+        print(f"❌ Primary Model Error: {e}", flush=True)
+        # خطة بديلة فورية بطلب موديل 1.5 إكسبريس في حال رفض الأول
+        try:
+            response = client.models.generate_content(
+                model="gemini-1.5-flash-8b",
+                contents=full_prompt
+            )
+            if response and response.text:
+                bot.reply_to(message, response.text)
+                return
+        except Exception as e2:
+            print(f"❌ Fallback Error: {e2}", flush=True)
+
         bot.reply_to(message, f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي:\n{e}")
 
 # استقبال تحديثات تليجرام
