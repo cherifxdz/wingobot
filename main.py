@@ -30,16 +30,18 @@ SYSTEM_PROMPT = """
 التزم بالرد بالعربية باختصار وبأسلوب واضح ومقسم في نقاط.
 """
 
-model = genai.GenerativeModel('gemini-1.5-flash')
+# تمرير التعليمات مباشرة للموديل لضمان التزام أفضل بالتعليمات
+model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=SYSTEM_PROMPT)
 
 # معالج الرسائل القادمة
 @bot.message_handler(func=lambda message: True)
 def process_message(message):
     try:
-        prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
-        response = model.generate_content(prompt)
+        # إرسال سؤال المستخدم مباشرة للموديل
+        response = model.generate_content(message.text)
         bot.reply_to(message, response.text)
     except Exception as e:
+        print(f"Error: {e}")  # طباعة الخطأ في الـ Logs لمعرفته
         bot.reply_to(message, "أهلاً بك! حدث خطأ بسيط أثناء معالجة الطلب، أعد المحاولة من فضلك.")
 
 # المسار الذي يستقبله تليغرام عند ارسال أي رسالة
@@ -48,7 +50,10 @@ def getMessage():
     if request.headers.get('content-type') == 'application/json':
         json_string = request.get_data().decode('utf-8')
         update = telebot.types.Update.de_json(json_string)
-        bot.process_new_messages([update.message])
+        
+        # ✅ التصحيح هنا: استخدام process_new_updates بدلاً من process_new_messages لتفادي أخطاء الـ NoneType
+        bot.process_new_updates([update])
+        
         return "OK", 200
     return "Forbidden", 403
 
