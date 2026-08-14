@@ -1,4 +1,5 @@
 import os
+import sys
 import telebot
 import google.generativeai as genai
 from flask import Flask, request
@@ -9,7 +10,12 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
-genai.configure(api_key=GEMINI_API_KEY)
+
+# تهيئة الذكاء الاصطناعي
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print("⚠️ WARNING: GEMINI_API_KEY is missing!", flush=True)
 
 SYSTEM_PROMPT = """
 أنت المساعد الذكي الرسمي لشركة WIN GO في الجزائر. تتحدث باللغة العربية بأسلوب محترف وودود.
@@ -36,17 +42,23 @@ model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=SYSTEM_PROM
 @bot.message_handler(func=lambda message: True)
 def process_message(message):
     try:
-        print(f"--- Received Message: {message.text} ---")
-        prompt = f"سؤال العميل: {message.text}"
-        response = model.generate_content(prompt)
+        print(f"📥 Received message: {message.text}", flush=True)
+        
+        # استدعاء Gemini API
+        response = model.generate_content(message.text)
         
         if response and response.text:
-            bot.reply_to(message, response.text)
+            print("📤 Sending response to Telegram...", flush=True)
+            bot.send_message(message.chat.id, response.text)
         else:
-            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولكن لم يتوفر رد مناسب حالياً.")
+            bot.send_message(message.chat.id, "أهلاً بك! تم استلام رسالتك لكن لم يتوفر رد من النموذج.")
+            
     except Exception as e:
-        print(f"!!! Error generating content: {e} !!!")
-        bot.reply_to(message, f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
+        print(f"❌ ERROR inside process_message: {e}", flush=True)
+        try:
+            bot.send_message(message.chat.id, f"حدث خطأ أثناء معالجة الطلب:\n{e}")
+        except Exception as send_err:
+            print(f"❌ Could not send error message to Telegram: {send_err}", flush=True)
 
 # المسار الذي يستقبله تليغرام عند ارسال أي رسالة
 @app.route('/' + str(TELEGRAM_TOKEN), methods=['POST'])
