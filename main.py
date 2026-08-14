@@ -46,13 +46,12 @@ def process_message(message):
     try:
         full_prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
         
-        # ✅ الاستدعاء الجديد الرسمي بناءً على Interactions API
+        # ✅ استخدام الموديل المعتمد رسميًا حسب وثيقة Interactions API
         interaction = client.interactions.create(
-            model="gemini-2.5-flash-lite",
+            model="gemini-3.6-flash",
             input=full_prompt
         )
         
-        # ✅ قراءة الرد عبر output_text حسب التوثيق الرسمي
         if interaction and interaction.output_text:
             bot.reply_to(message, interaction.output_text)
         else:
