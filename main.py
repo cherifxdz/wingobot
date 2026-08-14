@@ -33,8 +33,6 @@ SYSTEM_PROMPT = """
 client = None
 if GEMINI_API_KEY:
     client = genai.Client(api_key=GEMINI_API_KEY)
-else:
-    print("❌ GEMINI_API_KEY غير موجود في متغيرات البيئة!", flush=True)
 
 # معالج الرسائل
 @bot.message_handler(func=lambda message: True)
@@ -42,22 +40,22 @@ def process_message(message):
     print(f"📥 استلام رسالة: {message.text}", flush=True)
     
     if not client:
-        bot.reply_to(message, "⚠️ السيرفر يعمل، لكن لم يتم التعرف على مفتاح GEMINI_API_KEY!")
+        bot.reply_to(message, "⚠️ خطأ: لم يتم العثور على مفتاح GEMINI_API_KEY.")
         return
 
     try:
         full_prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
         
-        # استدعاء API المعتمد من مكتبة google-genai الحديثة
+        # ✅ استخدام الموديل المعتمد والمستقر رسمياً
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=full_prompt
         )
         
         if response and response.text:
             bot.reply_to(message, response.text)
         else:
-            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب حالياً.")
+            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب.")
             
     except Exception as e:
         print(f"❌ Gemini Error: {e}", flush=True)
