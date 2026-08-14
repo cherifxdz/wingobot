@@ -37,11 +37,14 @@ model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=SYSTEM_PROM
 @bot.message_handler(func=lambda message: True)
 def process_message(message):
     try:
-        # إرسال سؤال المستخدم مباشرة للموديل
+        print(f"Received message: {message.text}")
         response = model.generate_content(message.text)
-        bot.reply_to(message, response.text)
+        if response and response.text:
+            bot.reply_to(message, response.text)
+        else:
+            bot.reply_to(message, "عذراً، لم أتمكن من إيجاد إجابة مناسبة.")
     except Exception as e:
-        print(f"Error: {e}")  # طباعة الخطأ في الـ Logs لمعرفته
+        print(f"Error details: {e}")
         bot.reply_to(message, "أهلاً بك! حدث خطأ بسيط أثناء معالجة الطلب، أعد المحاولة من فضلك.")
 
 # المسار الذي يستقبله تليغرام عند ارسال أي رسالة
