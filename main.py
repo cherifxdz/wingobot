@@ -30,33 +30,31 @@ SYSTEM_PROMPT = """
 التزم بالرد بالعربية باختصار وبأسلوب واضح ومقسم في نقاط.
 """
 
-# تمرير التعليمات مباشرة للموديل لضمان التزام أفضل بالتعليمات
 model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=SYSTEM_PROMPT)
 
 # معالج الرسائل القادمة
 @bot.message_handler(func=lambda message: True)
 def process_message(message):
     try:
-        print(f"Received message: {message.text}")
-        response = model.generate_content(message.text)
+        print(f"--- Received Message: {message.text} ---")
+        prompt = f"سؤال العميل: {message.text}"
+        response = model.generate_content(prompt)
+        
         if response and response.text:
             bot.reply_to(message, response.text)
         else:
-            bot.reply_to(message, "عذراً، لم أتمكن من إيجاد إجابة مناسبة.")
+            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولكن لم يتوفر رد مناسب حالياً.")
     except Exception as e:
-        print(f"Error details: {e}")
-        bot.reply_to(message, "أهلاً بك! حدث خطأ بسيط أثناء معالجة الطلب، أعد المحاولة من فضلك.")
+        print(f"!!! Error generating content: {e} !!!")
+        bot.reply_to(message, f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
 
 # المسار الذي يستقبله تليغرام عند ارسال أي رسالة
-@app.route('/' + TELEGRAM_TOKEN, methods=['POST'])
+@app.route('/' + str(TELEGRAM_TOKEN), methods=['POST'])
 def getMessage():
     if request.headers.get('content-type') == 'application/json':
         json_string = request.get_data().decode('utf-8')
         update = telebot.types.Update.de_json(json_string)
-        
-        # ✅ التصحيح هنا: استخدام process_new_updates بدلاً من process_new_messages لتفادي أخطاء الـ NoneType
         bot.process_new_updates([update])
-        
         return "OK", 200
     return "Forbidden", 403
 
