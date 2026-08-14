@@ -15,7 +15,7 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 # تهيئة مفتاح الذكاء الاصطناعي
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     model = None
     print("❌ ERROR: GEMINI_API_KEY غير موجود في متغيرات البيئة!", flush=True)
