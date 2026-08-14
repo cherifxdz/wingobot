@@ -29,7 +29,7 @@ SYSTEM_PROMPT = """
 التزم بالرد بالعربية باختصار وبأسلوب واضح ومقسم في نقاط.
 """
 
-# تهيئة عميل Google GenAI بناءً على التوثيق الرسمي الصحيح
+# تهيئة عميل Google GenAI
 client = None
 if GEMINI_API_KEY:
     client = genai.Client(api_key=GEMINI_API_KEY)
@@ -46,19 +46,20 @@ def process_message(message):
     try:
         full_prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
         
-        # ✅ استخدام الموديل الصحيح الموصى به: gemini-2.5-flash-lite
-        response = client.models.generate_content(
+        # ✅ الاستدعاء الجديد الرسمي بناءً على Interactions API
+        interaction = client.interactions.create(
             model="gemini-2.5-flash-lite",
-            contents=full_prompt
+            input=full_prompt
         )
         
-        if response and response.text:
-            bot.reply_to(message, response.text)
+        # ✅ قراءة الرد عبر output_text حسب التوثيق الرسمي
+        if interaction and interaction.output_text:
+            bot.reply_to(message, interaction.output_text)
         else:
             bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب.")
             
     except Exception as e:
-        print(f"❌ Gemini Error: {e}", flush=True)
+        print(f"❌ Interactions API Error: {e}", flush=True)
         bot.reply_to(message, f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي:\n{e}")
 
 # استقبال تحديثات تليجرام
