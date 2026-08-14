@@ -29,26 +29,20 @@ SYSTEM_PROMPT = """
 التزم بالرد بالعربية باختصار وبأسلوب واضح ومقسم في نقاط.
 """
 
-# 🔍 البحث التلقائي عن الموديل الشغال في حسابك دون تخمين الأسماء
+# تهيئة الذكاء الاصطناعي مع استخدام الموديل المستقر
 model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    try:
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                print(f"✅ Selected available model: {m.name}", flush=True)
-                model = genai.GenerativeModel(m.name)
-                break
-    except Exception as e:
-        print(f"❌ Error fetching models: {e}", flush=True)
+    # الموديل الأساسي والمستقر
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
-# معالج الرسائل
+# معالج الرسائل القادمة
 @bot.message_handler(func=lambda message: True)
 def process_message(message):
     print(f"📥 استلام رسالة: {message.text}", flush=True)
     
     if not model:
-        bot.reply_to(message, "⚠️ تعذر الاتصال بنموذج الذكاء الاصطناعي، تحقق من مفتاح API.")
+        bot.reply_to(message, "⚠️ خطأ: لم يتم التعرف على مفتاح GEMINI_API_KEY.")
         return
 
     try:
@@ -58,10 +52,21 @@ def process_message(message):
         if response and response.text:
             bot.reply_to(message, response.text)
         else:
-            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب حالياً.")
+            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب.")
             
     except Exception as e:
         print(f"❌ Gemini Error: {e}", flush=True)
+        # تجربة الموديل الاحتياطي إذا فشل الأول
+        try:
+            fallback_model = genai.GenerativeModel('gemini-1.5-pro')
+            prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
+            res = fallback_model.generate_content(prompt)
+            if res and res.text:
+                bot.reply_to(message, res.text)
+                return
+        except Exception as fallback_err:
+            print(f"❌ Fallback Error: {fallback_err}", flush=True)
+
         bot.reply_to(message, f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي:\n{e}")
 
 # استقبال تحديثات تليجرام
