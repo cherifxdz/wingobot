@@ -1,6 +1,6 @@
 import os
 import telebot
-import google.generativeai as genai
+from google import genai
 from flask import Flask, request
 
 app = Flask(__name__)
@@ -29,44 +29,38 @@ SYSTEM_PROMPT = """
 التزم بالرد بالعربية باختصار وبأسلوب واضح ومقسم في نقاط.
 """
 
-# تهيئة الذكاء الاصطناعي مع استخدام الموديل المستقر
-model = None
+# تهيئة عميل Google GenAI الحديث
+client = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    # الموديل الأساسي والمستقر
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    print("❌ GEMINI_API_KEY غير موجود في متغيرات البيئة!", flush=True)
 
-# معالج الرسائل القادمة
+# معالج الرسائل
 @bot.message_handler(func=lambda message: True)
 def process_message(message):
     print(f"📥 استلام رسالة: {message.text}", flush=True)
     
-    if not model:
-        bot.reply_to(message, "⚠️ خطأ: لم يتم التعرف على مفتاح GEMINI_API_KEY.")
+    if not client:
+        bot.reply_to(message, "⚠️ السيرفر يعمل، لكن لم يتم التعرف على مفتاح GEMINI_API_KEY!")
         return
 
     try:
-        prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
-        response = model.generate_content(prompt)
+        full_prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
+        
+        # استدعاء API المعتمد من مكتبة google-genai الحديثة
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=full_prompt
+        )
         
         if response and response.text:
             bot.reply_to(message, response.text)
         else:
-            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب.")
+            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب حالياً.")
             
     except Exception as e:
         print(f"❌ Gemini Error: {e}", flush=True)
-        # تجربة الموديل الاحتياطي إذا فشل الأول
-        try:
-            fallback_model = genai.GenerativeModel('gemini-1.5-pro')
-            prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
-            res = fallback_model.generate_content(prompt)
-            if res and res.text:
-                bot.reply_to(message, res.text)
-                return
-        except Exception as fallback_err:
-            print(f"❌ Fallback Error: {fallback_err}", flush=True)
-
         bot.reply_to(message, f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي:\n{e}")
 
 # استقبال تحديثات تليجرام
