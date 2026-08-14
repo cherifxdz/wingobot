@@ -1,5 +1,4 @@
 import os
-import sys
 import telebot
 import google.generativeai as genai
 from flask import Flask, request
@@ -9,16 +8,7 @@ app = Flask(__name__)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ⚠️ هام جداً: threaded=False تمنع تجاهل الرسائل داخل سيرفرات Webhook مثل Render
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
-
-# تهيئة مفتاح الذكاء الاصطناعي
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')
-else:
-    model = None
-    print("❌ ERROR: GEMINI_API_KEY غير موجود في متغيرات البيئة!", flush=True)
 
 SYSTEM_PROMPT = """
 أنت المساعد الذكي الرسمي لشركة WIN GO في الجزائر. تتحدث باللغة العربية بأسلوب محترف وودود.
@@ -39,13 +29,26 @@ SYSTEM_PROMPT = """
 التزم بالرد بالعربية باختصار وبأسلوب واضح ومقسم في نقاط.
 """
 
+# 🔍 البحث التلقائي عن الموديل الشغال في حسابك دون تخمين الأسماء
+model = None
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                print(f"✅ Selected available model: {m.name}", flush=True)
+                model = genai.GenerativeModel(m.name)
+                break
+    except Exception as e:
+        print(f"❌ Error fetching models: {e}", flush=True)
+
 # معالج الرسائل
 @bot.message_handler(func=lambda message: True)
 def process_message(message):
     print(f"📥 استلام رسالة: {message.text}", flush=True)
     
     if not model:
-        bot.reply_to(message, "⚠️ السيرفر يعمل، لكن مفتاح GEMINI_API_KEY غير مضاف في لوحة Render!")
+        bot.reply_to(message, "⚠️ تعذر الاتصال بنموذج الذكاء الاصطناعي، تحقق من مفتاح API.")
         return
 
     try:
@@ -71,7 +74,7 @@ def getMessage():
         return "OK", 200
     return "Forbidden", 403
 
-# تفعيل الـ Webhook
+# مسار تفعيل الـ Webhook
 @app.route("/")
 def webhook():
     bot.remove_webhook()
