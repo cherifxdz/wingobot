@@ -9,13 +9,16 @@ app = Flask(__name__)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
+# ⚠️ هام جداً: threaded=False تمنع تجاهل الرسائل داخل سيرفرات Webhook مثل Render
+bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 
-# تهيئة الذكاء الاصطناعي
+# تهيئة مفتاح الذكاء الاصطناعي
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    print("⚠️ WARNING: GEMINI_API_KEY is missing!", flush=True)
+    model = None
+    print("❌ ERROR: GEMINI_API_KEY غير موجود في متغيرات البيئة!", flush=True)
 
 SYSTEM_PROMPT = """
 أنت المساعد الذكي الرسمي لشركة WIN GO في الجزائر. تتحدث باللغة العربية بأسلوب محترف وودود.
@@ -36,31 +39,29 @@ SYSTEM_PROMPT = """
 التزم بالرد بالعربية باختصار وبأسلوب واضح ومقسم في نقاط.
 """
 
-model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=SYSTEM_PROMPT)
-
-# معالج الرسائل القادمة
+# معالج الرسائل
 @bot.message_handler(func=lambda message: True)
 def process_message(message):
+    print(f"📥 استلام رسالة: {message.text}", flush=True)
+    
+    if not model:
+        bot.reply_to(message, "⚠️ السيرفر يعمل، لكن مفتاح GEMINI_API_KEY غير مضاف في لوحة Render!")
+        return
+
     try:
-        print(f"📥 Received message: {message.text}", flush=True)
-        
-        # استدعاء Gemini API
-        response = model.generate_content(message.text)
+        prompt = f"{SYSTEM_PROMPT}\n\nسؤال العميل: {message.text}"
+        response = model.generate_content(prompt)
         
         if response and response.text:
-            print("📤 Sending response to Telegram...", flush=True)
-            bot.send_message(message.chat.id, response.text)
+            bot.reply_to(message, response.text)
         else:
-            bot.send_message(message.chat.id, "أهلاً بك! تم استلام رسالتك لكن لم يتوفر رد من النموذج.")
+            bot.reply_to(message, "أهلاً بك! تم استلام رسالتك ولم يتوفر رد مناسب حالياً.")
             
     except Exception as e:
-        print(f"❌ ERROR inside process_message: {e}", flush=True)
-        try:
-            bot.send_message(message.chat.id, f"حدث خطأ أثناء معالجة الطلب:\n{e}")
-        except Exception as send_err:
-            print(f"❌ Could not send error message to Telegram: {send_err}", flush=True)
+        print(f"❌ Gemini Error: {e}", flush=True)
+        bot.reply_to(message, f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي:\n{e}")
 
-# المسار الذي يستقبله تليغرام عند ارسال أي رسالة
+# استقبال تحديثات تليجرام
 @app.route('/' + str(TELEGRAM_TOKEN), methods=['POST'])
 def getMessage():
     if request.headers.get('content-type') == 'application/json':
@@ -70,14 +71,14 @@ def getMessage():
         return "OK", 200
     return "Forbidden", 403
 
-# مسار تفعيل الـ Webhook
+# تفعيل الـ Webhook
 @app.route("/")
 def webhook():
     bot.remove_webhook()
     host_name = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
     if host_name:
         bot.set_webhook(url=f"https://{host_name}/{TELEGRAM_TOKEN}")
-        return "Webhook setup successfully! Bot is running!", 200
+        return "Webhook setup successfully!", 200
     return "Error: RENDER_EXTERNAL_HOSTNAME not found", 500
 
 if __name__ == "__main__":
